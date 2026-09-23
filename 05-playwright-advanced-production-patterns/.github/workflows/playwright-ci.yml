@@ -1,0 +1,77 @@
+# CI workflow for the Tutorial 5 suite.
+#
+# Design choices worth calling out (all explained in depth in README.md):
+#   - Runs inside the official Playwright Docker image so browsers/OS deps
+#     are guaranteed to match what visual-regression baselines were captured
+#     against (see tests/test_visual.py "Pitfalls").
+#   - Runs tests in parallel with pytest-xdist (-n auto) -- see README
+#     "Parallelization & Sharding" for how this differs from Playwright's
+#     multi-machine --shard flag.
+#   - Traces are captured with --tracing=retain-on-failure, so passing tests
+#     cost near-zero disk/artifact space and only failures produce a trace.
+#   - The HTML report and any failure traces are uploaded as build artifacts
+#     ONLY when the run fails, keeping the common case (green build) fast
+#     and cheap to store.
+name: Playwright CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Run Playwright suite
+    runs-on: ubuntu-latest
+    # Official Playwright image: browsers + OS deps preinstalled, so this job
+    # doesn't spend time on `playwright install --with-deps` at all.
+    container:
+      image: mcr.microsoft.com/playwright/python:v1.47.0-jammy
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Python dependencies
+        working-directory: 05-playwright-advanced-production-patterns
+        run: pip install --no-cache-dir -r requirements.txt
+
+      # Belt-and-suspenders: if the pip-installed `playwright` version ever
+      # drifts ahead of what's baked into the container image, this fills the
+      # gap. Cheap no-op when versions already match.
+      - name: Ensure Playwright browsers are installed
+        working-directory: 05-playwright-advanced-production-patterns
+        run: playwright install --with-deps
+
+      - name: Run tests (parallel, trace-on-failure, HTML report)
+        working-directory: 05-playwright-advanced-production-patterns
+        env:
+          # In a real project these come from GitHub Actions "Secrets", e.g.
+          # ${{ secrets.SAUCE_USERNAME }} -- never hardcoded in the workflow.
+          # saucedemo's public standard_user is safe to inline for this demo.
+          BASE_URL: https://www.saucedemo.com
+          SAUCE_USERNAME: standard_user
+          SAUCE_PASSWORD: secret_sauce
+        run: >
+          pytest -n auto
+          --tracing=retain-on-failure
+          --html=report.html --self-contained-html
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-html-report
+          path: 05-playwright-advanced-production-patterns/report.html
+          retention-days: 14
+
+      # Traces only exist for tests that failed (see --tracing=retain-on-failure
+      # above), so this upload is a no-op on a green build.
+      - name: Upload failure traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: 05-playwright-advanced-production-patterns/test-results/
+          retention-days: 14

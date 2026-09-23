@@ -1,0 +1,16 @@
+# Never commit real configuration/secrets — .env.example is the template
+# that gets committed; .env holds real (even if locally-scoped) values.
+.env
+
+# Test run artifacts — regenerated every run, noisy in diffs, and failure
+# screenshots/page-source can incidentally capture session data.
+artifacts/
+report.html
+report.html.assets/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.cache/
+*.egg-info/

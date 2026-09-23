@@ -1,0 +1,147 @@
+# ai-assisted-test-maintenance.yml
+#
+# ILLUSTRATIVE STARTING POINT — this is not a drop-in, secret-free solution.
+# It shows the *shape* of an AI-assisted test-maintenance workflow: run the
+# suite, let Claude Code (non-interactive / "print" mode) diagnose and fix
+# broken selectors, and open a PR for a human to review. Adapt auth,
+# permissions, cost controls, and the exact prompt to your own repo before
+# relying on this.
+#
+# Requirements before this can run:
+#   - An ANTHROPIC_API_KEY repo (or org) secret with a Claude API key that
+#     has a reasonable spend limit set on it.
+#   - Test-only credentials for whatever environment this suite targets,
+#     stored as their own secrets (e.g. TEST_USER, TEST_PASSWORD) — never
+#     production credentials.
+#   - This workflow should target a test/staging environment only. Do not
+#     point TARGET_BASE_URL at production.
+#
+# Human-in-the-loop by design: this workflow never pushes to main. It opens
+# a PR from a branch, and a person reviews and merges (or closes) it, same
+# as any other PR in this repo.
+
+name: AI-Assisted Test Maintenance (illustrative)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_suite:
+        description: "Subfolder to run/maintain, e.g. 05-playwright-advanced-production-patterns"
+        required: true
+        default: "05-playwright-advanced-production-patterns"
+  # Example schedule — adjust or remove. Running this on every commit is not
+  # recommended; treat it as an occasional maintenance job, not a gate.
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+
+# Minimal permissions: this job only needs to read the repo and open a PR.
+# It must NOT have permission to push directly to protected branches.
+permissions:
+  contents: write # needed to push the fix branch this workflow creates
+  pull-requests: write # needed to open the PR for human review
+
+jobs:
+  ai-fix-broken-selectors:
+    runs-on: ubuntu-latest
+    # Optional but recommended: require the run to be manually approved via
+    # a GitHub Environment protection rule before it can use secrets, on
+    # top of the workflow_dispatch/schedule trigger.
+    # environment: ai-maintenance-approval
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js (for the Claude Code CLI and Playwright MCP)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        working-directory: ${{ github.event.inputs.target_suite || '05-playwright-advanced-production-patterns' }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        working-directory: ${{ github.event.inputs.target_suite || '05-playwright-advanced-production-patterns' }}
+        run: python -m playwright install --with-deps
+
+      # Install the Claude Code CLI. Pin a version in your real workflow
+      # rather than using a floating tag, the same way you'd pin any other
+      # CI tool.
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run suite and capture failures
+        id: run_tests
+        working-directory: ${{ github.event.inputs.target_suite || '05-playwright-advanced-production-patterns' }}
+        continue-on-error: true
+        run: |
+          pytest -q --html=report.html --self-contained-html || echo "tests_failed=true" >> "$GITHUB_OUTPUT"
+
+      # Only invoke the agent if something actually failed — don't spend
+      # tokens (or risk unnecessary changes) on a green suite.
+      - name: Diagnose and fix with Claude Code (non-interactive)
+        if: steps.run_tests.outputs.tests_failed == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TARGET_SUITE: ${{ github.event.inputs.target_suite || '05-playwright-advanced-production-patterns' }}
+          # Test-only credentials for the environment under test. Never
+          # reference production secrets here.
+          TEST_USER: ${{ secrets.TEST_USER }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+        run: |
+          claude -p "The pytest suite in $TARGET_SUITE failed. Read the
+          pytest-html report at $TARGET_SUITE/report.html to see which
+          tests failed and why. If the failures are caused by a broken
+          locator (a selector that no longer matches the page, not a real
+          application bug), update the corresponding Page Object under
+          $TARGET_SUITE/pages/ to fix it, preferring role/label-based
+          locators over ids or CSS classes, consistent with CLAUDE.md in
+          this repo. Re-run 'pytest -q' in $TARGET_SUITE to confirm the
+          fix. Do not change test assertions to make a real failure pass.
+          Do not touch anything outside $TARGET_SUITE. Stop after you have
+          a passing suite or after you've determined the failure is not a
+          selector issue — in that case, leave the code unchanged and
+          explain why in your final output." \
+          --allowedTools "Read,Edit,Bash(pytest*)" \
+          --output-format text \
+          > claude-output.txt
+
+      - name: Show agent output in the job log
+        if: steps.run_tests.outputs.tests_failed == 'true'
+        run: cat claude-output.txt
+
+      # Open a PR instead of pushing to main. A human reviews the diff
+      # exactly like any other contributor's change before merging.
+      - name: Open pull request with proposed fix
+        if: steps.run_tests.outputs.tests_failed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "ai: propose fix for broken selector(s) in ${{ github.event.inputs.target_suite || '05-playwright-advanced-production-patterns' }}"
+          branch: "ai-selector-fix/${{ github.run_id }}"
+          title: "[AI-proposed] Selector fix after test failure"
+          body: |
+            Opened automatically by the `ai-assisted-test-maintenance`
+            workflow after a scheduled/manual run found failing tests.
+
+            This PR was generated by Claude Code running non-interactively
+            (`claude -p`). **It has not been reviewed by a human yet.**
+
+            Do not merge without:
+            - Reading the full diff
+            - Confirming the new locator is correct and unambiguous
+            - Confirming no credentials or environment-specific values were
+              hardcoded
+            - Re-running the suite in CI on this PR
+
+            Agent output is attached in the workflow run logs for this PR.
+          labels: |
+            ai-generated
+            needs-human-review

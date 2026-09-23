@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# Secrets / local config
+.env
+**/auth_setup/state.json
+
+# Test artifacts
+screenshots/
+artifacts/
+report.html
+*.png
+!**/tests/fixtures/*.png
+playwright-report/
+test-results/
+trace.zip
+**/*.zip
+
+# Playwright visual regression baselines are intentionally NOT ignored;
+# snapshot dirs are tracked so CI compares against committed baselines.
+
+# OS / editor
+.DS_Store
+Thumbs.db

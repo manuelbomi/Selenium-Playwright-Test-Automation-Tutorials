@@ -1,0 +1,94 @@
+# .github/workflows/selenium-ci.yml
+#
+# Runs this tutorial's suite headlessly, in parallel, against a Selenium
+# Grid brought up via docker-compose.yml — on every push and pull request.
+#
+# This is the same Grid you can run locally (see docker-compose.yml), so a
+# failure that reproduces in CI also reproduces on your machine with:
+#   docker compose up -d
+#   pytest --grid-url=http://localhost:4444/wd/hub -n auto
+
+name: Selenium CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  selenium-tests:
+    runs-on: ubuntu-latest
+
+    # The repo hosts six tutorials side by side; scope every step to this
+    # tutorial's own folder instead of the repo root.
+    defaults:
+      run:
+        working-directory: 03-selenium-advanced-production-patterns
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Start Selenium Grid (docker compose)
+        run: docker compose up -d
+
+      - name: Wait for Grid to report ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4444/wd/hub/status | grep -Eq '"ready"\s*:\s*true'; then
+              echo "Grid is ready."
+              exit 0
+            fi
+            echo "Waiting for Grid... ($i/30)"
+            sleep 2
+          done
+          echo "::error::Selenium Grid never became ready"
+          docker compose logs
+          exit 1
+
+      # No credentials/URLs are hardcoded here or in test code — everything
+      # flows through config.py, which reads these env vars. In a real repo,
+      # SAUCE_USERNAME/SAUCE_PASSWORD would be configured as encrypted
+      # GitHub Actions secrets (Settings -> Secrets and variables -> Actions),
+      # never committed, even though saucedemo's are public demo credentials.
+      - name: Run tests (headless, parallel, on Grid, with reruns)
+        env:
+          SELENIUM_GRID_URL: http://localhost:4444/wd/hub
+          HEADLESS: "true"
+          BASE_URL: https://www.saucedemo.com
+          WIDGETS_URL: https://the-internet.herokuapp.com
+          SAUCE_USERNAME: ${{ secrets.SAUCE_USERNAME }}
+          SAUCE_PASSWORD: ${{ secrets.SAUCE_PASSWORD }}
+        run: |
+          pytest -n auto \
+            --reruns 2 --reruns-delay 1 \
+            --grid-url="$SELENIUM_GRID_URL" \
+            --html=report.html --self-contained-html
+
+      - name: Stop Selenium Grid
+        if: always()
+        run: docker compose down
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-html-report
+          path: 03-selenium-advanced-production-patterns/report.html
+          if-no-files-found: warn
+
+      - name: Upload failure diagnostics (screenshots, page source, console logs)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-artifacts
+          path: 03-selenium-advanced-production-patterns/artifacts/
+          if-no-files-found: ignore

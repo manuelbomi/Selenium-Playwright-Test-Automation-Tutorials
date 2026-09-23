@@ -1,0 +1,59 @@
+# docker-compose.yml — local Selenium Grid.
+#
+# Running against real, disposable browser containers instead of drivers
+# installed on your own machine is what makes "it works on my laptop" and
+# "it works in CI" the same claim — CI (see .github/workflows/selenium-ci.yml)
+# brings up this exact same compose file.
+#
+# USAGE
+#   docker compose up -d                 # start the hub + browser nodes
+#   pytest --grid-url=http://localhost:4444/wd/hub -n auto
+#   docker compose down                  # tear it down
+#
+# Grid console (see connected nodes / live sessions / screenshots of
+# in-progress tests): http://localhost:4444/ui
+
+services:
+  selenium-hub:
+    image: selenium/hub:4.21.0
+    container_name: selenium-hub
+    ports:
+      - "4442:4442"  # event bus — publish
+      - "4443:4443"  # event bus — subscribe
+      - "4444:4444"  # Grid router / API — this is what tests connect to
+
+  chrome:
+    image: selenium/node-chrome:4.21.0
+    shm_size: 2gb  # default 64mb /dev/shm reliably crashes Chrome under load
+    depends_on:
+      - selenium-hub
+    environment:
+      - SE_EVENT_BUS_HOST=selenium-hub
+      - SE_EVENT_BUS_PUBLISH_PORT=4442
+      - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
+      # Let one node container run more than one session concurrently so a
+      # small local Grid can still back a `pytest -n auto` run.
+      - SE_NODE_MAX_SESSIONS=2
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+
+  firefox:
+    image: selenium/node-firefox:4.21.0
+    shm_size: 2gb
+    depends_on:
+      - selenium-hub
+    environment:
+      - SE_EVENT_BUS_HOST=selenium-hub
+      - SE_EVENT_BUS_PUBLISH_PORT=4442
+      - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
+      - SE_NODE_MAX_SESSIONS=2
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+
+# Note on file upload against Grid nodes: the node containers above have no
+# volumes mounted, so a local file path (like tests/fixtures/sample_upload.txt)
+# is NOT visible inside them. Selenium's Remote WebDriver handles this
+# automatically for send_keys() on a file input by transferring the file
+# from the client to the node — but only if the driver was created with
+# `LocalFileDetector` enabled, which Selenium 4's Remote driver enables by
+# default. No extra volume mount is required for this tutorial's upload
+# test; see README.md "File upload against Grid" for the details and for
+# what to do if you disable that behavior.

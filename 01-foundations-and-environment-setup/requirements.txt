@@ -1,0 +1,21 @@
+# Tutorial 1 dependencies: Selenium and Playwright stacks side by side.
+#
+# We use ">=" minimums instead of exact "==" pins on purpose for a tutorial repo:
+# exact pins rot fast (a pinned selenium version will eventually fail against
+# newer browser releases), and learners following this guide months from now
+# should get reasonably current, compatible versions. In a real production
+# project you WOULD pin exact versions (or use a lockfile like pip-tools /
+# poetry.lock) for reproducible CI builds -- we cover that tradeoff in later
+# tutorials.
+
+# --- Selenium stack ---
+selenium>=4.20.0          # WebDriver client bindings (W3C WebDriver protocol)
+webdriver-manager>=4.0.1  # Auto-downloads/matches the right driver binary for your browser
+
+# --- Playwright stack ---
+playwright>=1.44.0        # Playwright client + drives browsers via CDP/WebSocket
+pytest-playwright>=0.5.0  # pytest fixtures/integration for Playwright (page, browser, etc.)
+
+# --- Test running / reporting (shared by both stacks) ---
+pytest>=8.2.0             # Test runner used across this entire tutorial series
+pytest-html>=4.1.1        # Generates a self-contained HTML report from a pytest run

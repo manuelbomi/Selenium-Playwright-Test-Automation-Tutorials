@@ -1,0 +1,23 @@
+# Secrets / local config
+.env
+
+# Authenticated browser session -- this is effectively a credential file
+# (see auth_setup/generate_auth_state.py). Never commit it.
+auth_setup/state.json
+
+# Playwright / pytest artifacts
+test-results/
+playwright-report/
+report.html
+.pytest_cache/
+
+# Visual regression: local diff/actual images generated on a failed comparison
+# (checked-in baselines live under tests/*-snapshots/ and ARE committed)
+test-results/**/*-actual.png
+test-results/**/*-diff.png
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/

@@ -1,0 +1,6 @@
+This is a small dummy file used by tests/test_widgets.py::TestFileUpload
+to exercise the file-upload widget at https://the-internet.herokuapp.com/upload.
+
+It is intentionally tiny and contains no meaningful data — its only job is
+to exist at a stable, known path so `upload_file()` in pages/base_page.py
+has a real file to hand the browser via send_keys().

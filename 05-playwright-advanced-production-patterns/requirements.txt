@@ -1,0 +1,19 @@
+# Core test runner
+pytest==8.3.3
+
+# Playwright's pytest integration: provides the page/context/browser fixtures,
+# --browser / --headed / --tracing / --video CLI flags, and screenshot assertions
+pytest-playwright==0.5.2
+
+# The Playwright driver itself (browser automation + APIRequestContext for pure HTTP calls)
+playwright==1.47.0
+
+# Parallel test execution across CPU cores: `pytest -n auto`
+pytest-xdist==3.6.1
+
+# Loads .env files so secrets/config never get hardcoded in source
+python-dotenv==1.0.1
+
+# HTML report used by the CI workflow (--html=report.html); --self-contained-html
+# inlines assets so the single file is easy to upload/download as a CI artifact
+pytest-html==4.1.1

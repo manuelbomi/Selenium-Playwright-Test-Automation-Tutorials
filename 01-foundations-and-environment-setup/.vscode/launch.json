@@ -1,0 +1,38 @@
+{
+    // See https://go.microsoft.com/fwlink/?linkid=830387 for the full
+    // launch.json schema reference.
+    "version": "0.2.0",
+    "configurations": [
+        {
+            // This configuration lets you set a breakpoint in any pytest
+            // file, open that file in the editor, then press F5 (or use
+            // Run and Debug) to run JUST that file under the debugger --
+            // execution pauses at your breakpoints so you can inspect
+            // variables like `driver`, `page`, or a locator's found
+            // elements interactively.
+            "name": "Python: Debug Current pytest File",
+            "type": "debugpy",
+            "request": "launch",
+            // "module" tells the debugger to run "python -m pytest ..."
+            // rather than executing the file as a plain script -- this
+            // matters because pytest needs to be invoked as a module to
+            // correctly discover fixtures, conftest.py files, and markers.
+            "module": "pytest",
+            // "${file}" is a VS Code variable that resolves to whichever
+            // file is currently open/active in the editor. That means this
+            // one configuration works for ANY test file in the project --
+            // you don't need a separate launch config per test file.
+            "args": [
+                "${file}",
+                "-v",
+                "-s"
+            ],
+            // "-v" (verbose) prints each test's name and pass/fail result.
+            // "-s" disables output capturing so print() statements and
+            // browser console logs show up live in the Debug Console --
+            // very useful while you're still learning what each line does.
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}

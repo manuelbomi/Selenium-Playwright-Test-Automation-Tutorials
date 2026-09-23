@@ -1,0 +1,31 @@
+{
+    // Points VS Code's Python extension at the interpreter inside this
+    // tutorial's virtual environment (created with `python -m venv .venv`).
+    // Without this, VS Code may fall back to a global Python install that
+    // doesn't have selenium/playwright installed, causing confusing
+    // "module not found" errors in the editor even though `pip install`
+    // succeeded inside your activated venv.
+    //
+    // NOTE: On macOS/Linux the venv's interpreter lives at
+    // ".venv/bin/python" instead of ".venv/Scripts/python.exe". If you're
+    // not on Windows, change the path below accordingly.
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+
+    // Tells VS Code's Test Explorer (the Testing sidebar) to discover tests
+    // using pytest, in this same folder, rather than unittest.
+    "python.testing.pytestEnabled": true,
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestArgs": [
+        "."
+    ],
+
+    // Auto-discover tests as soon as the workspace opens, instead of
+    // requiring you to manually trigger "Refresh Tests" first.
+    "python.testing.autoTestDiscoverOnSaveEnabled": true,
+
+    // Keeps editor line length in view for readability -- purely a
+    // convenience ruler, not a hard limit.
+    "editor.rulers": [
+        88
+    ]
+}
